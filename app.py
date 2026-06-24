@@ -1,9 +1,6 @@
 import os
 import json
-import pickle
-
-# import numpy as np
-import pandas as pd
+import csv
 from flask import Flask, render_template, request
 from flask_cors import CORS, cross_origin
 
@@ -16,22 +13,48 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
 CORS(app)
 
-model = pickle.load(open(os.path.join(BASE_DIR, 'LinearRegressionModel.pkl'), 'rb'))
-car   = pd.read_csv(os.path.join(BASE_DIR, 'Cleaned_Car_data.csv'))
+# Load model parameters
+with open(os.path.join(BASE_DIR, 'model_parameters.json'), 'r') as f:
+    model_params = json.load(f)
+
+
+def load_car_data():
+    companies = set()
+    years = set()
+    fuel_types = set()
+    company_models = {}
+
+    csv_path = os.path.join(BASE_DIR, 'Cleaned_Car_data.csv')
+    with open(csv_path, mode='r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        next(reader) # skip header
+        for row in reader:
+            if not row or len(row) < 7:
+                continue
+            name = row[1]
+            company = row[2]
+            year = int(row[3])
+            fuel = row[6]
+            
+            companies.add(company)
+            years.add(year)
+            fuel_types.add(fuel)
+            
+            if company not in company_models:
+                company_models[company] = set()
+            company_models[company].add(name)
+
+    return (
+        sorted(list(companies)),
+        sorted(list(years), reverse=True),
+        sorted(list(fuel_types)),
+        {comp: sorted(list(models)) for comp, models in company_models.items()}
+    )
 
 
 @app.route('/', methods=['GET'])
 def index():
-    companies  = sorted(car['company'].unique())
-    years      = sorted(car['year'].unique(), reverse=True)
-    fuel_types = car['fuel_type'].unique()
-
-    # Exact company -> [models] map — avoids substring false-positives in JS
-    company_models = {
-        company: sorted(car[car['company'] == company]['name'].unique().tolist())
-        for company in companies
-    }
-
+    companies, years, fuel_types, company_models = load_car_data()
     return render_template(
         'index.html',
         companies=companies,
@@ -62,12 +85,17 @@ def predict():
 
     # --- Prediction ---------------------------------------------------------
     try:
-        df = pd.DataFrame(
-            columns=['name', 'company', 'year', 'kms_driven', 'fuel_type'],
-            data=[[car_model, company, year_int, driven_int, fuel_type]],
-        )
-        prediction = model.predict(df)
-        return str(np.round(prediction[0], 2))
+        # Linear regression calculation in pure python:
+        prediction = model_params['intercept']
+        prediction += model_params['coef_name'].get(car_model, 0.0)
+        prediction += model_params['coef_company'].get(company, 0.0)
+        prediction += model_params['coef_fuel_type'].get(fuel_type, 0.0)
+        prediction += model_params['coef_year'] * year_int
+        prediction += model_params['coef_kms_driven'] * driven_int
+
+        # Round to 2 decimal places
+        prediction_rounded = round(prediction, 2)
+        return str(prediction_rounded)
     except Exception as e:
         # Log the real error server-side; return a clean message to the client
         print(f'Prediction error: {e}')
