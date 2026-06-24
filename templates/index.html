@@ -2,113 +2,168 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Car Price Predictor</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Car Price Predictor</title>
+  <meta name="description" content="Predict the resale price of any used car instantly using machine learning. Choose your car brand, model, year, fuel type and mileage.">
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body>
 
-<div class="container">
+  <div class="card">
 
-    <h1>Car Price Predictor</h1>
+    <!-- Header with logo -->
+    <div class="card-header">
+      <img src="{{ url_for('static', filename='favicon.png') }}" alt="Car Price Predictor logo">
+      <div>
+        <h1>Car Price Predictor</h1>
+        <p>Get an instant ML-powered resale estimate</p>
+      </div>
+    </div>
 
-    <form>
+    <form id="predict-form">
 
-        <label>Company</label>
-        <select id="company" onchange="load_car_models()">
-            <option value="" disabled selected>Select Company</option>
-            {% for company in companies %}
-            <option value="{{ company }}">{{ company }}</option>
-            {% endfor %}
+      <div class="field">
+        <label for="company">Company</label>
+        <select id="company" onchange="load_car_models()" required>
+          <option value="" disabled selected>Select company</option>
+          {% for company in companies %}
+          <option value="{{ company }}">{{ company }}</option>
+          {% endfor %}
         </select>
+      </div>
 
-        <label>Model</label>
-        <select id="car_models"></select>
+      <div class="field">
+        <label for="car_models">Model</label>
+        <select id="car_models" required>
+          <option value="" disabled selected>Select model</option>
+        </select>
+      </div>
 
-        <label>Year</label>
-        <select id="year">
+      <div class="field-row">
+        <div class="field">
+          <label for="year">Year</label>
+          <select id="year" required>
             {% for year in years %}
             <option value="{{ year }}">{{ year }}</option>
             {% endfor %}
-        </select>
+          </select>
+        </div>
 
-        <label>Fuel Type</label>
-        <select id="fuel_type">
+        <div class="field">
+          <label for="fuel_type">Fuel Type</label>
+          <select id="fuel_type" required>
             {% for fuel in fuel_types %}
             <option value="{{ fuel }}">{{ fuel }}</option>
             {% endfor %}
-        </select>
+          </select>
+        </div>
+      </div>
 
-        <label>Kilometers Driven</label>
-        <input type="number" id="kilo_driven" placeholder="e.g. 45000" min="0">
+      <div class="field">
+        <label for="kilo_driven">Kilometers Driven</label>
+        <input type="number" id="kilo_driven" placeholder="e.g. 45000" min="0" required>
+      </div>
 
-        <button type="button" onclick="send_data()">
-            Predict Price
-        </button>
+      <button type="button" class="btn-predict" id="predict-btn" onclick="send_data()">
+        Predict Price
+      </button>
 
     </form>
 
-    <h3 id="prediction"></h3>
+    <!-- Result -->
+    <div id="result-box">
+      <div class="result-label" id="result-label">Estimated Resale Price</div>
+      <div class="result-price" id="result-price"></div>
+    </div>
 
-</div>
+  </div>
+
+  <p class="footer">Powered by Linear Regression &nbsp;·&nbsp; Indian used-car market data</p>
 
 <script>
-    // Exact company -> models map from the server (no substring hacks)
-    var COMPANY_MODELS = {{ company_models | safe }};
+  // Exact company → models map injected server-side (no substring guessing)
+  var COMPANY_MODELS = {{ company_models | safe }};
 
-function load_car_models() {
-    var companySelect = document.getElementById("company");
-    var car_model = document.getElementById("car_models");
+  function load_car_models() {
+    var companySelect  = document.getElementById('company');
+    var modelSelect    = document.getElementById('car_models');
     var selectedCompany = companySelect.value;
 
-    car_model.innerHTML = "";
+    modelSelect.innerHTML = '<option value="" disabled selected>Select model</option>';
 
     if (!selectedCompany || !COMPANY_MODELS[selectedCompany]) return;
 
-    var models = COMPANY_MODELS[selectedCompany];
-    models.forEach(function(model) {
-        var option = document.createElement("option");
-        option.value = model;
-        option.text = model;
-        car_model.add(option);
+    COMPANY_MODELS[selectedCompany].forEach(function(model) {
+      var opt = document.createElement('option');
+      opt.value = model;
+      opt.text  = model;
+      modelSelect.add(opt);
     });
-}
+  }
 
-window.onload = load_car_models;
+  window.onload = load_car_models;
 
+  function send_data() {
+    var company   = document.getElementById('company').value;
+    var carModel  = document.getElementById('car_models').value;
+    var year      = document.getElementById('year').value;
+    var fuelType  = document.getElementById('fuel_type').value;
+    var kmDriven  = document.getElementById('kilo_driven').value;
 
-function send_data() {
+    var resultBox   = document.getElementById('result-box');
+    var resultLabel = document.getElementById('result-label');
+    var resultPrice = document.getElementById('result-price');
+    var btn         = document.getElementById('predict-btn');
+
+    // Basic client-side guard
+    if (!company || !carModel || !kmDriven) {
+      resultBox.style.display = 'block';
+      resultBox.className = 'error';
+      resultLabel.textContent = 'Missing fields';
+      resultPrice.textContent = 'Please fill in all fields.';
+      return;
+    }
+
+    // Loading state
+    btn.textContent = 'Predicting…';
+    btn.disabled = true;
+    resultBox.style.display = 'none';
 
     var fd = new FormData();
+    fd.append('company',     company);
+    fd.append('car_models',  carModel);
+    fd.append('year',        year);
+    fd.append('fuel_type',   fuelType);
+    fd.append('kilo_driven', kmDriven);
 
-    fd.append("company", document.getElementById("company").value);
-    fd.append("car_models", document.getElementById("car_models").value);
-    fd.append("year", document.getElementById("year").value);
-    fd.append("fuel_type", document.getElementById("fuel_type").value);
-    fd.append("kilo_driven", document.getElementById("kilo_driven").value);
-
-    document.getElementById("prediction").innerHTML =
-        "Predicting...";
-
-    fetch("/predict", {
-        method: "POST",
-        body: fd
-    })
-    .then(response => response.text())
-    .then(data => {
-        document.getElementById("prediction").innerHTML =
-            "Predicted Price: ₹ " + data;
-    })
-    .catch(error => {
-        document.getElementById("prediction").innerHTML =
-            "Error getting prediction";
-        console.error(error);
-    });
-}
-
+    fetch('/predict', { method: 'POST', body: fd })
+      .then(function(res) {
+        if (!res.ok) return res.text().then(function(t) { throw new Error(t); });
+        return res.text();
+      })
+      .then(function(price) {
+        resultBox.style.display = 'block';
+        resultBox.className = '';
+        resultLabel.textContent = 'Estimated Resale Price';
+        resultPrice.textContent = '₹ ' + Number(price).toLocaleString('en-IN');
+      })
+      .catch(function(err) {
+        resultBox.style.display = 'block';
+        resultBox.className = 'error';
+        resultLabel.textContent = 'Error';
+        resultPrice.textContent = err.message || 'Could not get a prediction.';
+      })
+      .finally(function() {
+        btn.textContent = 'Predict Price';
+        btn.disabled = false;
+      });
+  }
 </script>
 
 </body>
