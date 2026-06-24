@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Price Predictor</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Car Price Predictor</h1>
+
+    <form>
+
+        <label>Company</label>
+        <select id="company" onchange="load_car_models()">
+            <option value="" disabled selected>Select Company</option>
+            {% for company in companies %}
+            <option value="{{ company }}">{{ company }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Model</label>
+        <select id="car_models"></select>
+
+        <label>Year</label>
+        <select id="year">
+            {% for year in years %}
+            <option value="{{ year }}">{{ year }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Fuel Type</label>
+        <select id="fuel_type">
+            {% for fuel in fuel_types %}
+            <option value="{{ fuel }}">{{ fuel }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Kilometers Driven</label>
+        <input type="number" id="kilo_driven" placeholder="e.g. 45000" min="0">
+
+        <button type="button" onclick="send_data()">
+            Predict Price
+        </button>
+
+    </form>
+
+    <h3 id="prediction"></h3>
+
+</div>
+
+<script>
+    // Exact company -> models map from the server (no substring hacks)
+    var COMPANY_MODELS = {{ company_models | safe }};
+
+function load_car_models() {
+    var companySelect = document.getElementById("company");
+    var car_model = document.getElementById("car_models");
+    var selectedCompany = companySelect.value;
+
+    car_model.innerHTML = "";
+
+    if (!selectedCompany || !COMPANY_MODELS[selectedCompany]) return;
+
+    var models = COMPANY_MODELS[selectedCompany];
+    models.forEach(function(model) {
+        var option = document.createElement("option");
+        option.value = model;
+        option.text = model;
+        car_model.add(option);
+    });
+}
+
+window.onload = load_car_models;
+
+
+function send_data() {
+
+    var fd = new FormData();
+
+    fd.append("company", document.getElementById("company").value);
+    fd.append("car_models", document.getElementById("car_models").value);
+    fd.append("year", document.getElementById("year").value);
+    fd.append("fuel_type", document.getElementById("fuel_type").value);
+    fd.append("kilo_driven", document.getElementById("kilo_driven").value);
+
+    document.getElementById("prediction").innerHTML =
+        "Predicting...";
+
+    fetch("/predict", {
+        method: "POST",
+        body: fd
+    })
+    .then(response => response.text())
+    .then(data => {
+        document.getElementById("prediction").innerHTML =
+            "Predicted Price: ₹ " + data;
+    })
+    .catch(error => {
+        document.getElementById("prediction").innerHTML =
+            "Error getting prediction";
+        console.error(error);
+    });
+}
+
+</script>
+
+</body>
+</html>

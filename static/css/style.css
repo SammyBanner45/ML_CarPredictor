@@ -1,0 +1,37 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #222;
+    color: white;
+}
+
+.container {
+    width: 600px;
+    margin: 40px auto;
+    background: #333;
+    padding: 20px;
+    border-radius: 10px;
+}
+
+h1, h5 {
+    text-align: center;
+}
+
+select,
+input,
+button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    margin-bottom: 15px;
+}
+
+button {
+    background: royalblue;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.9;
+}
