@@ -2,7 +2,7 @@ import os
 import json
 import pickle
 
-import numpy as np
+# import numpy as np
 import pandas as pd
 from flask import Flask, render_template, request
 from flask_cors import CORS, cross_origin
